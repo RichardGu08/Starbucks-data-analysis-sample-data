@@ -1,0 +1,81 @@
+-- making bi_transcript table:
+
+CREATE TABLE bidw.bi_transcripts AS 
+SELECT t.person, t.event, t.value, t.time, CAST(t.value->>'$.amount' AS DECIMAL(10,2)) as amount,
+ p.reward, p.difficulty as difficulty, p.duration as duration, p.offer_type as offer_type, pr.gender as gender, pr.age as age, pr.income, pr.signup_date
+FROM starbucks.transcript t
+Left Join  starbucks.portfolio p on p.id = COALESCE(t.value->>'$. "offer id"', t.value->>'$. "offer id"')  -- enclose in double quotes because space
+Left Join starbucks.profile pr on t.person = pr.id
+;
+
+ALTER TABLE `bidw`.`bi_transcripts` 
+ADD COLUMN `days_passed` INT NULL AFTER `time`;
+
+UPDATE bidw.bi_transcripts t
+JOIN (
+    SELECT 
+        person, 
+        time,
+        -- Calculate the difference between current time and previous time
+        time - LAG(time) OVER (PARTITION BY person ORDER BY time ASC, CASE WHEN event = 'transaction' then 1 ELSE 2 END) as diff
+    FROM bidw.bi_transcripts
+) src ON t.person = src.person AND t.time = src.time
+SET t.days_passed = src.diff 
+;
+
+
+
+-- For bi_channels:
+
+Create table bidw.bi_channels as
+
+Select c.id, c.channels, cn.channel, b.signup_date, b.income, b.age, b.gender, b.event, b.value, JSON_VALUE(b.value, '$."offer_id"') as offer_id
+
+from channels c
+Left Join channel_names cn on c.channels = cn.channel_id
+Right join bidw.bi_transcripts b on c.id = REGEXP_REPLACE(CAST(b.value ->> '$."offer_id"' as CHAR), '"','' )
+
+where b.value->>'$."offer_id"' is not null
+
+
+
+#query to get age ranges:
+SELECT 
+    CONCAT(FLOOR(age / 10) * 10, '-', (FLOOR(age / 10) * 10) + 9) AS age_range,
+    COUNT(*) AS count
+FROM profile
+GROUP BY age_range
+order by cast(SUBSTRING_INDEX(age_range, '-', 1) as UNSIGNED ) asc
+
+
+
+
+
+
+##################################### Add new org alias:
+	#check:
+SELECT * FROM Bidw.bi_Excel_commissions e
+left join bi_commissions_breakdown c on e.org_name = c.org_alias
+where c.org_name is null
+
+
+
+SELECT * FROM Bidw.bi_commissions_breakdown;
+
+insert into bi_commissions_breakdown (org_alias, org_id, org_name, client_id, partnership, plan_type)
+values  ('purecremationwisconsi' , 503, 'Pure Cremation Wisconsin', 100, 'with_partner', 'free')
+
+;
+Update bi_commissions_breakdown 
+set org_alias = 'columbiacremationcare'
+where org_id = 548
+
+##################################### 
+#whitelabeled orgs:
+
+
+SELECT o.*, os.custom_domain
+from chalicedb.org o
+JOIN chalicedb.org_setting os ON o.org_id = os.org_id
+where o.is_deleted = 0 and o.org_type in ('flcp', 'flcb') and os.custom_domain is not null
+-- and client_id = 100;
