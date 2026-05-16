@@ -19,7 +19,7 @@
 
 ## Business Question
 
-How can Starbucks increase the total sales revenue by providing different offers to different custom
+How can Starbucks increase the total sales revenue by providing different offers to different customers
 
 ## Understand the Data Sets
 
